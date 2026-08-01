@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { socket } from './socket';
+import { socket, SOCKET_URL } from './socket';
 import JoinRoom from './components/JoinRoom';
 import WaitingRoom from './components/WaitingRoom';
 import DiceRollAnimation from './components/DiceRollAnimation';
@@ -13,8 +13,14 @@ export default function App() {
   const [nickname, setNickname] = useState(null);
   const [roomState, setRoomState] = useState(null);
   const [error, setError] = useState(null);
+  const [connectingAction, setConnectingAction] = useState(null); // 'create' | 'join' | 'reconnect' | null
 
   useEffect(() => {
+    // Proactive background ping to wake up the Render backend immediately when user lands
+    fetch(`${SOCKET_URL}/health`).catch(err => {
+      console.log('Background server wake-up ping:', err);
+    });
+
     // Check if there is an active session to recover
     const storedRoomId = sessionStorage.getItem('roomId');
     const storedNickname = sessionStorage.getItem('nickname');
@@ -22,6 +28,7 @@ export default function App() {
     if (storedRoomId && storedNickname) {
       setRoomId(storedRoomId);
       setNickname(storedNickname);
+      setConnectingAction('reconnect');
       socket.connect();
       socket.emit('join_room', { roomId: storedRoomId, nickname: storedNickname });
     }
@@ -35,6 +42,14 @@ export default function App() {
     // Disconnect listener
     function onDisconnect() {
       setConnected(false);
+      setConnectingAction(null);
+    }
+
+    // Connect error listener (server starting up or offline)
+    function onConnectError(err) {
+      console.error('Socket connection error:', err);
+      setError('Não foi possível conectar ao servidor. O servidor pode estar iniciando (levando até 1 minuto) ou offline.');
+      setConnectingAction(null);
     }
 
     // Handle room updates
@@ -46,6 +61,7 @@ export default function App() {
     // Handle errors from the backend
     function onError(message) {
       setError(message);
+      setConnectingAction(null);
       // If there's a critical room join/find error, clear session storage
       if (message.includes('Sala não encontrada') || message.includes('cheia')) {
         handleLeaveRoom();
@@ -58,6 +74,7 @@ export default function App() {
       setNickname(hostName);
       sessionStorage.setItem('roomId', createdRoomId);
       sessionStorage.setItem('nickname', hostName);
+      setConnectingAction(null);
     }
 
     // Handle room joined confirmation
@@ -66,6 +83,7 @@ export default function App() {
       setNickname(playerName);
       sessionStorage.setItem('roomId', joinedRoomId);
       sessionStorage.setItem('nickname', playerName);
+      setConnectingAction(null);
     }
 
     // Handle left notification
@@ -76,6 +94,7 @@ export default function App() {
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
+    socket.on('connect_error', onConnectError);
     socket.on('room_update', onRoomUpdate);
     socket.on('error', onError);
     socket.on('room_created', onRoomCreated);
@@ -85,6 +104,7 @@ export default function App() {
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
+      socket.off('connect_error', onConnectError);
       socket.off('room_update', onRoomUpdate);
       socket.off('error', onError);
       socket.off('room_created', onRoomCreated);
@@ -94,6 +114,7 @@ export default function App() {
   }, []);
 
   const handleCreateRoom = (name) => {
+    setConnectingAction('create');
     if (!socket.connected) {
       socket.connect();
     }
@@ -101,6 +122,7 @@ export default function App() {
   };
 
   const handleJoinRoom = (roomCode, name) => {
+    setConnectingAction('join');
     if (!socket.connected) {
       socket.connect();
     }
@@ -127,6 +149,7 @@ export default function App() {
     setNickname(null);
     setRoomState(null);
     setError(null);
+    setConnectingAction(null);
   };
 
   // Determine current active view based on roomState.state
@@ -137,6 +160,7 @@ export default function App() {
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           error={error}
+          connectingAction={connectingAction}
         />
       );
     }
