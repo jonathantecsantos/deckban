@@ -1,7 +1,7 @@
 {
-  "name": "deckstalishar-backend",
+  "name": "deckban-backend",
   "version": "1.0.0",
-  "description": "Backend real-time server for Flesh and Blood deck ban manager",
+  "description": "Backend real-time server for deck ban manager",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

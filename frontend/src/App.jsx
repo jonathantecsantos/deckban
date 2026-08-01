@@ -222,10 +222,10 @@ export default function App() {
             </div>
             <div>
               <span className="text-lg font-bold text-white leading-none tracking-wide block">
-                DECKSTALISHAR
+                DECKBAN
               </span>
               <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-semibold block mt-0.5">
-                Real-Time Fab Ban Manager
+                Real-Time Ban Manager
               </span>
             </div>
           </div>
@@ -253,8 +253,9 @@ export default function App() {
       </main>
 
       {/* Global Footer */}
-      <footer className="border-t border-zinc-950 bg-zinc-950/40 text-center py-4 text-xs text-zinc-600 font-medium">
-        <p>Deckstalishar &copy; {new Date().getFullYear()} - Gerenciamento de Banimento de Decks para Flesh and Blood</p>
+      <footer className="border-t border-zinc-950 bg-zinc-950/40 text-center py-4 text-xs text-zinc-600 font-medium space-y-1">
+        <p>Deckban - Gerenciamento de banimento de Decks</p>
+        <p>Desenvolvimento por Jonathan Santos</p>
       </footer>
     </div>
   );

@@ -70,7 +70,7 @@ export default function MatchSummary({ players, nickname, onResetRoom }) {
           Confronto Definido!
         </h1>
         <p className="text-sm text-zinc-400 mt-2">
-          Os banimentos foram efetuados. Copie os dados e cole no Discord da sua liga!
+          Os banimentos foram efetuados. Copie os dados e envie no WhatsApp da sua liga!
         </p>
       </div>
 
@@ -170,7 +170,7 @@ export default function MatchSummary({ players, nickname, onResetRoom }) {
       <div className="w-full p-6 bg-zinc-950 border border-zinc-900 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
         <div className="flex-1 min-w-0">
           <span className="text-[10px] text-fab-gold font-bold uppercase tracking-widest block mb-1">
-            Formato de Exportação (Discord)
+            Formato de Exportação (WhatsApp)
           </span>
           <code className="text-xs bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg text-white font-mono block truncate max-w-full">
             {getMarkdownText()}

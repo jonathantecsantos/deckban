@@ -48,10 +48,10 @@ export default function JoinRoom({ onCreateRoom, onJoinRoom, error, connectingAc
             <Swords size={32} />
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-wide text-center">
-            DECKSTALISHAR
+            DECKBAN
           </h1>
           <p className="text-xs text-fab-gold font-medium uppercase tracking-widest mt-1">
-            Flesh and Blood Ban Manager
+            Ban Manager
           </p>
         </div>
 
