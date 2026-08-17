@@ -1,52 +1,55 @@
 import React, { useState } from 'react';
-import { ShieldAlert, Flame, User, AlertCircle } from 'lucide-react';
+import { ShieldAlert, Flame, User, Clock, CheckCircle } from 'lucide-react';
 
-export default function BanPhase({ players, nickname, turnName, onBanDeck }) {
+export default function BanPhase({ players, nickname, onBanDeck }) {
   const [selectedDeck, setSelectedDeck] = useState(null);
 
   const me = players.find(p => p.name === nickname);
   const opponent = players.find(p => p.name !== nickname);
 
-  const isMyTurn = turnName === nickname;
+  // Check if I have already banned a deck (using hasBanned flag from backend)
+  const didIBan = me?.hasBanned;
+  const opponentBanned = opponent?.hasBanned;
 
-  // Check if I have already banned a deck
-  const didIBan = me?.bannedOpponentDeck !== null;
-
-  // Opponent's banned deck (the deck of mine that the opponent banned)
-  const myBannedDeck = opponent?.bannedOpponentDeck;
-
-  // My banned deck (the deck of the opponent that I banned)
+  // The deck of the opponent that I banned
   const opponentBannedDeck = me?.bannedOpponentDeck;
 
   const handleBanSubmit = () => {
-    if (!selectedDeck || !isMyTurn || didIBan) return;
+    if (!selectedDeck || didIBan) return;
     onBanDeck(selectedDeck);
     setSelectedDeck(null); // Reset local selection
   };
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-8">
-      <h1 className="sr-only">Fase de Banimento de Decks</h1>
-      {/* Turn Banner Status */}
+      <h1 className="sr-only">Fase de Banimento Secreto de Decks</h1>
+      
+      {/* Dynamic Banner Status */}
       <div className="mb-10 text-center">
-        {isMyTurn ? (
+        {!didIBan ? (
           <div className="inline-flex flex-col items-center p-6 rounded-2xl border border-red-500/30 bg-gradient-to-b from-red-950/20 to-zinc-950/80 shadow-lg shadow-red-500/5 animate-pulse max-w-xl w-full">
             <div className="flex items-center gap-2 text-red-500 font-extrabold tracking-widest text-sm uppercase mb-1">
               <Flame size={16} />
-              Sua vez de banir!
+              Escolha seu banimento
             </div>
             <p className="text-zinc-200 text-base font-medium">
-              Escolha exatamente 1 deck do oponente abaixo para banir do confronto.
+              Selecione 1 deck de {opponent?.name} abaixo para banir do confronto.
             </p>
           </div>
         ) : (
           <div className="inline-flex flex-col items-center p-6 rounded-2xl border border-zinc-800 bg-zinc-950/60 max-w-xl w-full">
-            <div className="flex items-center gap-2 text-zinc-500 font-bold tracking-widest text-xs uppercase mb-1">
-              <div className="w-2 h-2 rounded-full bg-zinc-600 animate-ping"></div>
+            <div className="flex items-center gap-2 text-fab-gold font-bold tracking-widest text-xs uppercase mb-1">
+              <Clock className="animate-spin" size={14} />
               Aguardando oponente...
             </div>
             <p className="text-zinc-400 text-sm font-medium">
-              {opponent?.name} está escolhendo qual dos seus decks banir.
+              Você baniu secretamente: <strong className="text-white">"{opponentBannedDeck}"</strong>.
+            </p>
+            <p className="text-xs text-zinc-500 mt-2">
+              {opponentBanned 
+                ? `${opponent?.name} também já baniu. Carregando resultado...` 
+                : `Aguardando ${opponent?.name} enviar a escolha dele.`
+              }
             </p>
           </div>
         )}
@@ -66,42 +69,33 @@ export default function BanPhase({ players, nickname, turnName, onBanDeck }) {
           </div>
 
           <div className="space-y-4">
-            {me?.decks.map((deck, idx) => {
-              const isBanned = myBannedDeck === deck;
-              return (
-                <div
-                  key={idx}
-                  className={`p-5 rounded-xl border transition-all duration-300 ${
-                    isBanned
-                      ? 'border-red-950 bg-zinc-950/40 opacity-40 shadow-inner'
-                      : 'border-zinc-800 bg-zinc-950/20 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div className="flex-1 min-w-0 pr-4">
-                      <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
-                        Herói {idx + 1}
-                      </span>
-                      <h4 className={`text-base font-bold text-white truncate ${isBanned ? 'line-through text-red-500/70' : ''}`}>
-                        {deck}
-                      </h4>
-                    </div>
+            {me?.decks.map((deck, idx) => (
+              <div
+                key={idx}
+                className="p-5 rounded-xl border border-zinc-800 bg-zinc-950/25 opacity-80"
+              >
+                <div className="flex justify-between items-center">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
+                      Herói {idx + 1}
+                    </span>
+                    <h4 className="text-base font-bold text-white truncate">
+                      {deck}
+                    </h4>
+                  </div>
 
-                    <div>
-                      {isBanned ? (
-                        <span className="px-2 py-1 bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-bold rounded-md uppercase tracking-wider">
-                          Banido pelo Oponente
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] font-bold rounded-md uppercase tracking-wider">
-                          Ativo
-                        </span>
-                      )}
-                    </div>
+                  <div>
+                    <span className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] font-bold rounded-md uppercase tracking-wider">
+                      Ativo
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
+          </div>
+          
+          <div className="p-4 bg-zinc-950/40 border border-zinc-900/60 rounded-xl text-xs text-zinc-500">
+            💡 O banimento do oponente permanece oculto para você até que ambos tenham finalizado suas escolhas.
           </div>
         </div>
 
@@ -119,25 +113,25 @@ export default function BanPhase({ players, nickname, turnName, onBanDeck }) {
 
           <div className="space-y-4">
             {opponent?.decks.map((deck, idx) => {
-              const isBanned = opponentBannedDeck === deck;
+              const isBannedByMe = opponentBannedDeck === deck;
               const isSelected = selectedDeck === deck;
 
               return (
                 <div
                   key={idx}
                   onClick={() => {
-                    if (isMyTurn && !didIBan && !isBanned) {
+                    if (!didIBan) {
                       setSelectedDeck(isSelected ? null : deck);
                     }
                   }}
                   className={`p-5 rounded-xl border transition-all duration-300 ${
-                    isBanned
-                      ? 'border-red-950 bg-zinc-950/40 opacity-40 shadow-inner cursor-not-allowed'
-                      : isMyTurn && !didIBan
-                      ? isSelected
-                        ? 'border-fab-gold bg-zinc-900/60 glow-gold cursor-pointer scale-[1.02]'
-                        : 'border-zinc-800 bg-zinc-950/20 hover:border-fab-gold/50 cursor-pointer hover:scale-[1.01]'
-                      : 'border-zinc-800 bg-zinc-950/20'
+                    didIBan
+                      ? isBannedByMe
+                        ? 'border-red-950 bg-red-950/10 glow-crimson opacity-90 scale-[1.01]'
+                        : 'border-zinc-900 bg-zinc-950/40 opacity-40 cursor-not-allowed'
+                      : isSelected
+                      ? 'border-fab-gold bg-zinc-900/60 glow-gold cursor-pointer scale-[1.02]'
+                      : 'border-zinc-800 bg-zinc-950/20 hover:border-fab-gold/50 cursor-pointer hover:scale-[1.01]'
                   }`}
                 >
                   <div className="flex justify-between items-center">
@@ -145,17 +139,18 @@ export default function BanPhase({ players, nickname, turnName, onBanDeck }) {
                       <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block mb-1">
                         Herói {idx + 1}
                       </span>
-                      <h4 className={`text-base font-bold text-white truncate ${isBanned ? 'line-through text-red-500/70' : ''}`}>
+                      <h4 className={`text-base font-bold text-white truncate ${didIBan && !isBannedByMe ? 'opacity-40' : ''}`}>
                         {deck}
                       </h4>
                     </div>
 
                     <div>
-                      {isBanned ? (
-                        <span className="px-2 py-1 bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-bold rounded-md uppercase tracking-wider">
-                          Banido por Você
+                      {isBannedByMe ? (
+                        <span className="px-2 py-1 bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-bold rounded-md uppercase tracking-wider flex items-center gap-1">
+                          <CheckCircle size={10} />
+                          Selecionado
                         </span>
-                      ) : isMyTurn && !didIBan ? (
+                      ) : !didIBan ? (
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"
@@ -165,8 +160,8 @@ export default function BanPhase({ players, nickname, turnName, onBanDeck }) {
                           />
                         </div>
                       ) : (
-                        <span className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] font-bold rounded-md uppercase tracking-wider">
-                          Ativo
+                        <span className="px-2 py-1 bg-zinc-900 border border-zinc-800 text-zinc-500 text-[10px] font-bold rounded-md uppercase tracking-wider">
+                          Oculto
                         </span>
                       )}
                     </div>
@@ -177,7 +172,7 @@ export default function BanPhase({ players, nickname, turnName, onBanDeck }) {
           </div>
 
           {/* Action Ban Button */}
-          {isMyTurn && !didIBan && (
+          {!didIBan && (
             <div className="pt-4">
               <button
                 onClick={handleBanSubmit}

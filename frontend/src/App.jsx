@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { socket, SOCKET_URL } from './socket';
 import JoinRoom from './components/JoinRoom';
 import WaitingRoom from './components/WaitingRoom';
-import DiceRollAnimation from './components/DiceRollAnimation';
 import BanPhase from './components/BanPhase';
 import MatchSummary from './components/MatchSummary';
 import { Swords, Wifi, WifiOff } from 'lucide-react';
@@ -177,20 +176,11 @@ export default function App() {
             onLeaveRoom={handleLeaveRoom}
           />
         );
-      case 'dice_rolling':
-        return (
-          <DiceRollAnimation
-            diceResult={roomState.diceResult}
-            players={roomState.players}
-            firstBannerIndex={roomState.firstBannerIndex}
-          />
-        );
       case 'banning':
         return (
           <BanPhase
             players={roomState.players}
             nickname={nickname}
-            turnName={roomState.turnName}
             onBanDeck={handleBanDeck}
           />
         );

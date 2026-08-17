@@ -70,7 +70,7 @@ export default function MatchSummary({ players, nickname, onResetRoom }) {
           Confronto Definido!
         </h1>
         <p className="text-sm text-zinc-400 mt-2">
-          Os banimentos foram efetuados. Copie os dados e envie no WhatsApp da sua liga!
+          Os banimentos foram efetuados.
         </p>
       </div>
 

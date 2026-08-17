@@ -36,24 +36,33 @@ function generateRoomId() {
   return result;
 }
 
-// Helper to clean up empty rooms or reset rooms with active players
-function getCleanRoomState(room) {
-  return {
-    id: room.id,
-    players: room.players.map(p => ({
-      name: p.name,
-      ready: p.ready,
-      decks: p.ready && room.state !== 'ready_to_submit' && room.state !== 'waiting' ? p.decks : [], // Hide decks until both ready
-      bannedOpponentDeck: p.bannedOpponentDeck,
-      isHost: p.isHost
-    })),
-    state: room.state,
-    diceResult: room.diceResult,
-    firstBannerIndex: room.firstBannerIndex,
-    // Send active banner's name instead of socket ID to be connection-agnostic
-    activeBannerName: room.players[room.firstBannerIndex]?.name, // Fallback helper
-    turnName: room.players.find(p => p.id === room.turn)?.name || null
-  };
+// Send personalized room updates to each player to preserve secret ban states
+function sendRoomUpdate(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  room.players.forEach(p => {
+    const cleanPlayers = room.players.map(otherPlayer => {
+      // Reveal bannedOpponentDeck only in summary state, OR if it belongs to the player themselves
+      const isMe = otherPlayer.id === p.id;
+      const showBan = room.state === 'summary' || (room.state === 'banning' && isMe);
+
+      return {
+        name: otherPlayer.name,
+        ready: otherPlayer.ready,
+        decks: otherPlayer.ready && room.state !== 'ready_to_submit' && room.state !== 'waiting' ? otherPlayer.decks : [],
+        bannedOpponentDeck: showBan ? otherPlayer.bannedOpponentDeck : null,
+        hasBanned: !!otherPlayer.bannedOpponentDeck,
+        isHost: otherPlayer.isHost
+      };
+    });
+
+    io.to(p.id).emit('room_update', {
+      id: room.id,
+      players: cleanPlayers,
+      state: room.state
+    });
+  });
 }
 
 io.on('connection', (socket) => {
@@ -79,15 +88,12 @@ io.on('connection', (socket) => {
           isHost: true
         }
       ],
-      state: 'waiting',
-      diceResult: null,
-      firstBannerIndex: null,
-      turn: null
+      state: 'waiting'
     };
 
     socket.join(roomId);
     socket.emit('room_created', { roomId, nickname });
-    io.to(roomId).emit('room_update', getCleanRoomState(rooms[roomId]));
+    sendRoomUpdate(roomId);
     console.log(`Room created: ${roomId} by ${nickname}`);
   });
 
@@ -114,17 +120,11 @@ io.on('connection', (socket) => {
     if (existingPlayerIndex !== -1) {
       // Reconnection: update the socket ID and rejoin room
       console.log(`Player ${formattedName} reconnected to room ${roomKey}`);
-      const oldPlayerSocketId = room.players[existingPlayerIndex].id;
       room.players[existingPlayerIndex].id = socket.id;
-
-      // Update turn if it belonged to the old socket
-      if (room.turn === oldPlayerSocketId) {
-        room.turn = socket.id;
-      }
 
       socket.join(roomKey);
       socket.emit('room_joined', { roomId: roomKey, nickname: formattedName });
-      io.to(roomKey).emit('room_update', getCleanRoomState(room));
+      sendRoomUpdate(roomKey);
       return;
     }
 
@@ -147,7 +147,7 @@ io.on('connection', (socket) => {
     room.state = 'ready_to_submit';
     socket.join(roomKey);
     socket.emit('room_joined', { roomId: roomKey, nickname: formattedName });
-    io.to(roomKey).emit('room_update', getCleanRoomState(room));
+    sendRoomUpdate(roomKey);
     console.log(`Player ${formattedName} joined room ${roomKey}`);
   });
 
@@ -179,32 +179,15 @@ io.on('connection', (socket) => {
     const allReady = room.players.length === 2 && room.players.every(p => p.ready);
 
     if (allReady) {
-      room.state = 'dice_rolling';
-      // Roll dice internally: 1 to 6 (50/50 splits: 1-3 vs 4-6)
-      const dice = Math.floor(Math.random() * 6) + 1;
-      room.diceResult = dice;
-      // 1, 2, 3 -> Player 1 (Host/Index 0) bans first
-      // 4, 5, 6 -> Player 2 (Joinee/Index 1) bans first
-      room.firstBannerIndex = dice <= 3 ? 0 : 1;
-      room.turn = room.players[room.firstBannerIndex].id;
-
-      io.to(roomKey).emit('room_update', getCleanRoomState(room));
-      console.log(`Room ${roomKey}: Both players ready. Rolled ${dice}. First banner: index ${room.firstBannerIndex}`);
-
-      // Transition to 'banning' after a delay (allows dice roll animation to play)
-      setTimeout(() => {
-        // Double check if room still exists and is in dice_rolling state
-        if (rooms[roomKey] && rooms[roomKey].state === 'dice_rolling') {
-          rooms[roomKey].state = 'banning';
-          io.to(roomKey).emit('room_update', getCleanRoomState(rooms[roomKey]));
-        }
-      }, 12500); // 12.5 seconds buffer: 3.5s read logic, 3s spin, 3.5s slow decelerate, 2.5s review winner
+      room.state = 'banning';
+      sendRoomUpdate(roomKey);
+      console.log(`Room ${roomKey}: Both players ready. Transitioning to secret ban phase.`);
     } else {
-      io.to(roomKey).emit('room_update', getCleanRoomState(room));
+      sendRoomUpdate(roomKey);
     }
   });
 
-  // 4. BAN DECK
+  // 4. BAN DECK (Simultaneous & Secret)
   socket.on('ban_deck', ({ roomId, deckName }) => {
     const roomKey = roomId?.toUpperCase();
     const room = rooms[roomKey];
@@ -219,16 +202,17 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.turn !== socket.id) {
-      socket.emit('error', 'Não é o seu turno para banir.');
-      return;
-    }
-
     const player = room.players.find(p => p.id === socket.id);
     const opponent = room.players.find(p => p.id !== socket.id);
 
     if (!player || !opponent) {
       socket.emit('error', 'Jogadores não identificados.');
+      return;
+    }
+
+    // Check if player already banned a deck
+    if (player.bannedOpponentDeck) {
+      socket.emit('error', 'Você já baniu um deck.');
       return;
     }
 
@@ -241,19 +225,16 @@ io.on('connection', (socket) => {
     // Set the ban
     player.bannedOpponentDeck = deckName;
 
-    // Switch turn or end banning phase
-    const allBanned = room.players.every(p => p.bannedOpponentDeck !== null);
+    // Check if both players have now banned
+    const allBanned = room.players.length === 2 && room.players.every(p => p.bannedOpponentDeck !== null);
 
     if (allBanned) {
       room.state = 'summary';
-      room.turn = null;
-    } else {
-      // Switch turn to the opponent
-      room.turn = opponent.id;
+      console.log(`Room ${roomKey}: Both players banned. Transitioning to summary.`);
     }
 
-    io.to(roomKey).emit('room_update', getCleanRoomState(room));
-    console.log(`Room ${roomKey}: Player ${player.name} banned opponent's deck "${deckName}"`);
+    sendRoomUpdate(roomKey);
+    console.log(`Room ${roomKey}: Player ${player.name} banned opponent's deck "${deckName}" secretly`);
   });
 
   // 5. RESET / RESTART MATCH
@@ -268,16 +249,13 @@ io.on('connection', (socket) => {
 
     // Reset game state
     room.state = 'ready_to_submit';
-    room.diceResult = null;
-    room.firstBannerIndex = null;
-    room.turn = null;
     room.players.forEach(p => {
       p.decks = [];
       p.ready = false;
       p.bannedOpponentDeck = null;
     });
 
-    io.to(roomKey).emit('room_update', getCleanRoomState(room));
+    sendRoomUpdate(roomKey);
     console.log(`Room ${roomKey} reset successfully`);
   });
 
@@ -294,8 +272,7 @@ io.on('connection', (socket) => {
         const disconnectingPlayerName = room.players[playerIndex].name;
         
         // Setup a small timeout to allow session recovery.
-        // If they reconnect within 5 seconds, they restore their spot.
-        // If they don't, we notify the room and fallback.
+        // If they reconnect within 6 seconds, they restore their spot.
         setTimeout(() => {
           const activeRoom = rooms[roomKey];
           if (!activeRoom) return;
@@ -314,16 +291,13 @@ io.on('connection', (socket) => {
             } else {
               // Reset state back to waiting
               activeRoom.state = 'waiting';
-              activeRoom.diceResult = null;
-              activeRoom.firstBannerIndex = null;
-              activeRoom.turn = null;
               activeRoom.players.forEach(p => {
                 p.ready = false;
                 p.decks = [];
                 p.bannedOpponentDeck = null;
                 p.isHost = true; // Remainder player becomes host
               });
-              io.to(roomKey).emit('room_update', getCleanRoomState(activeRoom));
+              sendRoomUpdate(roomKey);
               io.to(roomKey).emit('player_left', `${disconnectingPlayerName} saiu da sala.`);
             }
           }

@@ -139,8 +139,8 @@ export default function WaitingRoom({ roomId, players, nickname, onSubmitDecks, 
             <ul className="text-xs text-zinc-500 space-y-2 list-disc list-inside">
               <li>Ambos os jogadores devem registrar seus 3 heróis.</li>
               <li>Os decks ficam ocultos até que ambos estejam "Prontos".</li>
-              <li>A ordem de banimento é definida por um dado virtual de 6 lados.</li>
-              <li>Quem tirar de 1 a 3 (Host) ou de 4 a 6 (Oponente) bane primeiro.</li>
+              <li>O banimento é feito de forma simultânea e secreta por ambos.</li>
+              <li>A revelação das escolhas ocorre apenas após os dois banirem.</li>
             </ul>
           </div>
         </div>
